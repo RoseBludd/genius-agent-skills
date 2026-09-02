@@ -1,0 +1,15 @@
+name = "cadis-ai-gateway"
+main = "worker.js"
+compatibility_date = "2026-08-07"
+
+# Cloudflare Workers AI binding — enables @cf/* model access
+[ai]
+binding = "AI"
+
+# Disable Workers observability logs: no prompt/response payloads or request
+# metadata are retained by Cloudflare (sovereign lane — data stays on our host).
+[observability]
+enabled = false
+
+# Route to custom domain
+routes = [{ pattern = "cadis.geniuzs.com", custom_domain = true }]

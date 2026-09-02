@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# Cursor Agent CLI wrapper — Genius Substrates / Zo Computer
+# Location: Skills/cursor-agent-cli/scripts/cursor-agent
+#
+# The cursor `agent` binary installs to ~/.local/bin (not always on PATH).
+# This wrapper fixes PATH, applies safe defaults for headless runs, and
+# handles the workspace-trust gate so `run` works non-interactively.
+#
+# Commands:
+#   status                       Auth + account status
+#   models                       List models available to this account
+#   chats                        List local chat sessions (from transcript store, with titles)
+#   trust <dir>                  Mark a directory as trusted for agent runs
+#   run [opts] "<prompt>"        Headless run. Opts:
+#       --cwd <dir>              Working directory (repo root). Default: current dir
+#       --model <id>             e.g. composer-2.5, gpt-5.6, 'claude-opus-4-8[context=1m,effort=high]'
+#       --mode plan|ask          Read-only modes (safe recon)
+#       --json | --stream-json   Structured output (with -p)
+#       --continue | --resume <id>
+#       --timeout <seconds>      Kill after N seconds (default 600)
+#       --no-trust               Do NOT auto-trust the cwd
+#   passthrough: anything else goes straight to `agent` (e.g. `mcp`, `login`, `about`)
+#
+# Safety defaults: sandbox ON is the CLI's own config choice; this wrapper NEVER
+# passes --force/--yolo. Use --mode plan for recon tasks. Approval mode in
+# ~/.cursor/cli-config.json is "allowlist" — extend it there if needed.
+
+set -uo pipefail
+export PATH="$HOME/.local/bin:$PATH"
+AGENT="agent"
+
+PROJECTS_DIR="$HOME/.cursor/projects"
+
+slugify() {  # /home/workspace/Projects/foo -> home-workspace-Projects-foo
+    echo "$1" | sed 's|^/||; s|/|-|g'
+}
+
+trust_dir() {
+    local dir="$1"
+    local abs; abs="$(cd "$dir" && pwd)"
+    local slug; slug="$(slugify "$abs")"
+    local pdir="$PROJECTS_DIR/$slug"
+    mkdir -p "$pdir/agent-transcripts"
+    if [ ! -f "$pdir/.workspace-trusted" ]; then
+        printf '{"trustedAt": "%s", "workspacePath": "%s"}' \
+            "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" "$abs" > "$pdir/.workspace-trusted"
+    fi
+}
+
+cmd="${1:-help}"
+shift 2>/dev/null || true
+
+case "$cmd" in
+    status|whoami)
+        exec $AGENT status "$@"
+        ;;
+    models|--list-models)
+        exec $AGENT models "$@"
+        ;;
+    trust)
+        trust_dir "$1"
+        echo "trusted: $1"
+        ;;
+    chats)
+        python3 - "$PROJECTS_DIR" <<'PYEOF'
+import json, glob, os, sys, datetime
+def fmt(ms):
+    return datetime.datetime.fromtimestamp(ms/1000, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC") if ms else "-"
+projects = sys.argv[1]
+rows = []
+for proj in sorted(os.listdir(projects)):
+    pdir = os.path.join(projects, proj)
+    if not os.path.isdir(pdir):
+        continue
+    t_dir = os.path.join(pdir, "agent-transcripts")
+    if not os.path.isdir(t_dir):
+        continue
+    for tid in sorted(os.listdir(t_dir)):
+        tf = os.path.join(pdir, "agent-transcripts", tid, f"{tid}.jsonl")
+        title, msgs, updated = "?", 0, None
+        if os.path.exists(os.path.join(pdir, "agent-transcripts", tid, f"{tid}.jsonl")):
+            with open(os.path.join(pdir, "agent-transcripts", tid, f"{tid}.jsonl")) as f:
+                for line in f:
+                    try:
+                        e = json.loads(line)
+                    except Exception:
+                        continue
+                    if e.get("role") in ("user", "assistant"):
+                        msgs += 1
+                        if e["role"] == "user" and title == "?":
+                            for c in e.get("message", {}).get("content", []):
+                                if c.get("type") == "text":
+                                    t = c["text"].split("<user_query>")[-1].split("</user_query>")[0].strip()
+                                    if t:
+                                        title = t.splitlines()[0][:80]
+                        continue
+                    if e.get("type") == "turn_ended":
+                        updated = "done:" + e.get("status", "?")
+            rows.append((tid, proj, msgs, title, updated or "-"))
+        else:
+            rows.append((tid, proj, 0, "(no transcript)", "-"))
+for tid, proj, msgs, title, st in rows:
+    print(f"[{st:12}] {tid}  ({proj})  {msgs} msgs")
+    print(f"               {title}")
+PYEOF
+        ;;
+    run)
+        CWD=""; MODEL=""; MODE=""; FMT="text"; TIMEOUT=600; TRUST=1; EXTRA=()
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --cwd) CWD="$2"; shift 2;;
+                --model) MODEL="$2"; shift 2;;
+                --mode) EXTRA+=(--mode "$2"); shift 2;;
+                --json) FMT="json"; shift;;
+                --stream-json) FMT="stream-json"; shift;;
+                --continue) EXTRA+=(--continue); shift;;
+                --resume) EXTRA+=(--resume "$2"); shift 2;;
+                --timeout) TIMEOUT="$2"; shift 2;;
+                --no-trust) TRUST=0; shift;;
+                -*) EXTRA+=("$1"); shift;;
+                *) break;;
+            esac
+        done
+        [ -z "$CWD" ] && CWD="$(pwd)"
+        if [ "$TRUST" = "1" ]; then trust_dir "$CWD"; fi
+        cd "$CWD"
+        # Pin default model to Composer 2.5 (regular, NOT fast) unless --model passed
+        # or MODEL_OVERRIDE set. Server-side default resolves to `auto` — this wrapper
+        # is the enforcement point. Matches /root/devvy/run on genius-substrates-host.
+        # Local Zo box = Free account: Auto only (named models like composer-2.5
+        # are unavailable server-side and hard-fail). Run with account default;
+        # explicit --model is honored if the caller passes one.
+        exec timeout "$TIMEOUT" $AGENT -p --output-format "$FMT" "${EXTRA[@]}" "$@"
+        ;;
+    *)
+        # help or any native subcommand (login, mcp, plugin, persist, about, ...)
+        exec $AGENT "$@"
+        ;;
+esac
