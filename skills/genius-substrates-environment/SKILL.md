@@ -1,6 +1,6 @@
 ---
 name: genius-substrates-environment
-description: Canonical reference for the Genius Substrates production environment — the Genius Substrates host server (accessed via Skills/tailscale-server-access) and everything living there: Coolify-managed applications, Infisical vault, mTLS developer infrastructure, host services, and the complete index of environment variables and secrets across every container. Use whenever work touches the server environment: env vars, secrets, tokens, deployments, service wiring, or anything that needs to "use the secrets accordingly." The environment map indexes variable NAMES and locations — actual VALUES are never stored in skill files.
+description: "Canonical reference for the Genius Substrates production environment — the Genius Substrates host server (accessed via Skills/tailscale-server-access) and everything living there: Coolify-managed applications, Infisical vault, mTLS developer infrastructure, host services, and the complete index of environment variables and secrets across every container. Use whenever work touches the server environment: env vars, secrets, tokens, deployments, service wiring, or anything that needs to \"use the secrets accordingly.\" The environment map indexes variable NAMES and locations — actual VALUES are never stored in skill files."
 metadata:
   author: genius.zo.computer
 compatibility: Created for Zo Computer

@@ -1,6 +1,6 @@
 ---
 name: tailscale-server-access
-description: Securely access the Genius Substrates tailnet over Tailscale SSH — the production host (genius-substrates-host, <tailnet-ip>: Coolify/Infisical/mTLS/Probo) AND the Zo computer (genius-zo-computer, 100.117.236.68: Coder, Genius IDE, CADIS gate/adapter, chatd, supermemory, ollama). Use whenever the user says "access the server", "on the server", "ssh to the host", "the genius substrates host", or needs CADIS/Coder/Genius-IDE operations on the Zo computer. Bundles a full server context map so navigation needs no re-discovery.
+description: "Securely access the Genius Substrates tailnet over Tailscale SSH — the production host (genius-substrates-host, <tailnet-ip>: Coolify/Infisical/mTLS/Probo) AND the Zo computer (genius-zo-computer, <zo-computer-tailnet-ip>: Coder, Genius IDE, CADIS gate/adapter, chatd, supermemory, ollama). Use whenever the user says \"access the server\", \"on the server\", \"ssh to the host\", \"the genius substrates host\", or needs CADIS/Coder/Genius-IDE operations on the Zo computer. Bundles a full server context map so navigation needs no re-discovery."
 metadata:
   author: genius.zo.computer
 compatibility: Created for Zo Computer
@@ -19,9 +19,9 @@ Two tailnet nodes, one pattern — pick the target by task:
 | Node | IP | What runs there | When to use |
 |---|---|---|---|
 | **genius-substrates-host** | `<tailnet-ip>` | Production server: Coolify, Infisical vault, mTLS/Genius DB, Probo compliance, ~77-container substrate | "access the server" / any host task |
-| **genius-zo-computer** | `100.117.236.68` | THIS machine. Coder control plane (coderd `:7080`), Genius IDE (`:3088`), CADIS gate (`:7070`), CADIS openai-adapter, chatd, supermemory (`:6767`), ollama (`:11434`), next/frpc stack. Tailscale `RunSSH: true` — inbound SSH works identically to the host | CADIS / Coder / Genius IDE / AI-stack work |
+| **genius-zo-computer** | `<zo-computer-tailnet-ip>` | THIS machine. Coder control plane (coderd `:7080`), Genius IDE (`:3088`), CADIS gate (`:7070`), CADIS openai-adapter, chatd, supermemory (`:6767`), ollama (`:11434`), next/frpc stack. Tailscale `RunSSH: true` — inbound SSH works identically to the host | CADIS / Coder / Genius IDE / AI-stack work |
 
-> You (the agent) RUN INSIDE the Zo computer. Do NOT SSH into `100.117.236.68` from a session you're already in — that's self-hopping; operate it directly (root local shell + localhost ports). The node entry exists for inter-node access (e.g. from the host or another tailnet machine): `tailscale ssh root@100.117.236.68` works the same way as the host.
+> You (the agent) RUN INSIDE the Zo computer. Do NOT SSH into `<zo-computer-tailnet-ip>` from a session you're already in — that's self-hopping; operate it directly (root local shell + localhost ports). The node entry exists for inter-node access (e.g. from the host or another tailnet machine): `tailscale ssh root@<zo-computer-tailnet-ip>` works the same way as the host.
 
 > Hostnames `genius-substrates-host` and `genius-zo-computer` also resolve (use either). Tailscale-only: SSH works when `tailscale status` shows the node online.
 
@@ -42,7 +42,7 @@ tailscale ssh root@<tailnet-ip> 'systemctl status genius-automations-sync-bridge
 
 ## Before you connect
 
-1. **Always run `tailscale status` first** — confirm the tailnet is up and the target node (`genius-substrates-host` `<tailnet-ip>` or `genius-zo-computer` `100.117.236.68`) is online. If the daemon is down: `tailscale up`; if the node shows `offline`, it's down (do not spam retries).
+1. **Always run `tailscale status` first** — confirm the tailnet is up and the target node (`genius-substrates-host` `<tailnet-ip>` or `genius-zo-computer` `<zo-computer-tailnet-ip>`) is online. If the daemon is down: `tailscale up`; if the node shows `offline`, it's down (do not spam retries).
 2. Known hosts are already populated (`~/.ssh/known_hosts`). If a "host key changed" warning appears, do NOT bypass it — stop and report, something changed.
 3. The box runs ~77 containers and is chronically busy (load 8+). Prefer targeted single commands over broad sweeps; avoid `docker prune` / destructive ops unless explicitly allowed (platform has cron for that).
 
@@ -66,4 +66,4 @@ tailscale ssh root@<tailnet-ip> 'systemctl status genius-automations-sync-bridge
 
 ## Change log
 - 2026-08-05 — Created with verified connectivity (tailscale 1.102.1, `tailscale ssh root@<tailnet-ip>` OK) + full server context map captured.
-- 2026-08-06 — Added the **Zo computer** node (`genius-zo-computer` / `100.117.236.68`): verified `tailscale status` shows it active/direct, `RunSSH: true`, sshd on `:2288` with substrate `authorized_keys`; coderd `:7080`, Genius IDE `:3088`, CADIS gate `:7070`, adapter, chatd, supermemory `:6767`, ollama `:11434` confirmed running locally. Documented the self-access rule (operate the Zo computer directly — you live on it).
+- 2026-08-06 — Added the **Zo computer** node (`genius-zo-computer` / `<zo-computer-tailnet-ip>`): verified `tailscale status` shows it active/direct, `RunSSH: true`, sshd on `:2288` with substrate `authorized_keys`; coderd `:7080`, Genius IDE `:3088`, CADIS gate `:7070`, adapter, chatd, supermemory `:6767`, ollama `:11434` confirmed running locally. Documented the self-access rule (operate the Zo computer directly — you live on it).
