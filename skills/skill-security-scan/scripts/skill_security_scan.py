@@ -123,13 +123,91 @@ def scan_skill(skill_dir: Path):
 ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
+def run_one(skill_dir: Path, threshold_name: str, trusted: bool, report: Path | None):
+    findings, hashes = scan_skill(skill_dir)
+    findings.sort(key=lambda f: (ORDER.get(f.get("severity", "low"), 3), f.get("file", "")))
+    threshold = ORDER[threshold_name]
+    blocking = [f for f in findings if ORDER.get(f.get("severity", "low"), 3) <= threshold]
+    result = {
+        "skill": skill_dir.name,
+        "scanned_at": datetime.now(timezone.utc).isoformat(),
+        "files_scanned": len(hashes),
+        "finding_count": len(findings),
+        "blocking_count": len(blocking),
+        "threshold": threshold_name,
+        "findings": findings,
+        "trusted": trusted,
+        "verdict": ("TRUSTED-PASS" if trusted else ("BLOCK" if blocking else ("PASS-WITH-WARNINGS" if findings else "PASS"))),
+    }
+    if report:
+        rep = Path(report)
+        rep.parent.mkdir(parents=True, exist_ok=True)
+        lines = [
+            f"# Skill Security Scan — {skill_dir.name}",
+            f"- Scanned: {result['scanned_at']}",
+            f"- Files scanned: {result['files_scanned']}",
+            f"- Threshold: {threshold_name} | Findings: {result['finding_count']} | Blocking: {result['blocking_count']}",
+            f"- Verdict: **{result['verdict']}**",
+            "",
+        ]
+        if findings:
+            lines.append("| Sev | File:Line | Title | Detail |")
+            lines.append("|---|---|---|---|")
+            for f in findings:
+                lines.append(f"| {f['severity'].upper()} | `{f.get('file','?')}:{f.get('line',0)}` | {f['title']} | {f.get('why', f.get('detail',''))[:120]} |")
+        else:
+            lines.append("No findings.")
+        rep.write_text("\n".join(lines) + "\n")
+        result["report"] = str(rep)
+    return result
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("skill_dir")
-    ap.add_argument("--report", help="Write markdown report to this path")
+    ap.add_argument("skill_dir", nargs="?", help="Single skill directory to scan")
+    ap.add_argument("--all", dest="all_root", metavar="SKILLS_ROOT", help="Batch mode: scan every subdirectory of SKILLS_ROOT and print one aggregate JSON")
+    ap.add_argument("--report", help="Write markdown report to this path (single mode) or combined markdown report (batch mode)")
     ap.add_argument("--severity-threshold", default="medium", choices=["high", "medium", "low"])
     ap.add_argument("--trusted", action="store_true", help="First-party skill reviewed by a human: findings still reported, verdict TRUSTED-PASS, exit 0")
+    ap.add_argument("--trusted-list", metavar="N1,N2", default="", help="Batch mode: comma-separated skill names to mark TRUSTED-PASS after human review")
     args = ap.parse_args()
+
+    if args.all_root:
+        root = Path(args.all_root).resolve()
+        if not root.is_dir():
+            print(json.dumps({"error": f"not a directory: {root}"}))
+            sys.exit(2)
+        trusted_set = {n.strip() for n in args.trusted_list.split(",") if n.strip()}
+        results = []
+        for child in sorted(p for p in root.iterdir() if p.is_dir() and (p / "SKILL.md").exists()):
+            results.append(run_one(child, args.severity_threshold, child.name in trusted_set, None))
+        blocked = [r for r in results if r["verdict"] == "BLOCK"]
+        aggregate = {
+            "root": str(root),
+            "scanned_at": datetime.now(timezone.utc).isoformat(),
+            "skills_scanned": len(results),
+            "pass": sum(1 for r in results if r["verdict"] == "PASS"),
+            "trusted_pass": sum(1 for r in results if r["verdict"] == "TRUSTED-PASS"),
+            "pass_with_warnings": sum(1 for r in results if r["verdict"] == "PASS-WITH-WARNINGS"),
+            "block": [r["skill"] for r in blocked],
+            "results": results,
+        }
+        if args.report:
+            rep = Path(args.report)
+            rep.parent.mkdir(parents=True, exist_ok=True)
+            lines = [f"# Skill Security Scan — batch {args.severity_threshold}-threshold", f"- Scanned: {aggregate['scanned_at']}", f"- Skills: {aggregate['skills_scanned']} | PASS: {aggregate['pass']} | TRUSTED-PASS: {aggregate['trusted_pass']} | WARNINGS: {aggregate['pass_with_warnings']} | BLOCK: {len(blocked)}", ""]
+            for r in results:
+                flag = " ⚠" if r["verdict"] == "BLOCK" else (" ~" if r["verdict"] == "PASS-WITH-WARNINGS" else "")
+                lines.append(f"- **{r['skill']}**: {r['verdict']}{flag} ({r['finding_count']} findings)")
+                for f in r["findings"]:
+                    lines.append(f"  - {f['severity'].upper()} `{f.get('file','?')}:{f.get('line',0)}` {f['title']}")
+            rep.write_text("\n".join(lines) + "\n")
+            aggregate["report"] = str(rep)
+        print(json.dumps(aggregate, indent=2))
+        sys.exit(1 if blocked else 0)
+
+    if not args.skill_dir:
+        ap.error("provide a skill directory, or --all SKILLS_ROOT for batch mode")
 
     skill_dir = Path(args.skill_dir).resolve()
     if not skill_dir.is_dir():
