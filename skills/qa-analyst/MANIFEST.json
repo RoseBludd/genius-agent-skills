@@ -1,0 +1,14 @@
+{
+  "name": "qa-analyst",
+  "version": "1.0.0",
+  "upstream": "afonsoft/skills (clawhub.ai)",
+  "license": "MIT",
+  "adaptedBy": "genius.zo.computer",
+  "date": "2026-09-09",
+  "included": [
+    "LICENSE",
+    "MODIFICATIONS.md",
+    "SKILL.md",
+    "TEMPLATES.md"
+  ]
+}
