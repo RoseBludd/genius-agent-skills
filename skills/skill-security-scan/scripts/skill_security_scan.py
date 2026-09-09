@@ -41,7 +41,8 @@ PATTERNS = [
     # Dangerous execution
     (r"curl[^|;&\n]*\|\s*(ba)?sh", "high", "curl piped to shell", "Remote code execution pattern."),
     (r"wget[^|;&\n]*-O\s*-?\s*\|\s*(ba)?sh", "high", "wget piped to shell", "Remote code execution pattern."),
-    (r"base64\s+-d[^|;&\n]*\|\s*(ba)?sh", "high", "base64-decoded shell", "Obfuscated remote/local code execution."),
+    (r"base64\s+-d[^|;&\n]*\|\s*(ba)?sh", "high", "base64-decoded shell", "Obfuscated remote/local code execution."),    (r"eval\s*\"?[\$]\(\s*echo\s+[A-Za-z0-9+/=]{8,}\s*\|\s*base64\s+-d", "high", "base64-piped eval", "Shell eval of base64-decoded content — classic obfuscated payload."),
+    (r"\$\(\s*echo\s+[A-Za-z0-9+/=]{24,}\s*\|\s*(base64\s+-d|openssl\s+enc)", "high", "decoded command substitution", "Command substitution over encoded content."),
     (r"\beval\s*\(\s*(os|subprocess|exec)\b|\beval\s*\(\s*(atob|Buffer\.)", "medium", "Dynamic eval of decoded content", "Runtime evaluation of constructed code."),
     (r"rm\s+-rf?\s+(/|~|\$HOME)", "high", "Destructive rm on system/home paths", "Can destroy the host filesystem."),
     (r"chmod\s+[0-7]*[67]7\s+/", "medium", "World-writable chmod on system path", "Privilege-weakening operation."),
