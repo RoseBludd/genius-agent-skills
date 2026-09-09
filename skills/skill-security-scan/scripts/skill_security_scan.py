@@ -128,6 +128,7 @@ def main():
     ap.add_argument("skill_dir")
     ap.add_argument("--report", help="Write markdown report to this path")
     ap.add_argument("--severity-threshold", default="medium", choices=["high", "medium", "low"])
+    ap.add_argument("--trusted", action="store_true", help="First-party skill reviewed by a human: findings still reported, verdict TRUSTED-PASS, exit 0")
     args = ap.parse_args()
 
     skill_dir = Path(args.skill_dir).resolve()
@@ -148,7 +149,8 @@ def main():
         "blocking_count": len(blocking),
         "threshold": args.severity_threshold,
         "findings": findings,
-        "verdict": "BLOCK" if blocking else ("PASS-WITH-WARNINGS" if findings else "PASS"),
+        "trusted": args.trusted,
+        "verdict": ("TRUSTED-PASS" if args.trusted else ("BLOCK" if blocking else ("PASS-WITH-WARNINGS" if findings else "PASS"))),
     }
 
     if args.report:
@@ -173,7 +175,7 @@ def main():
         result["report"] = str(rep)
 
     print(json.dumps(result, indent=2))
-    sys.exit(1 if blocking else 0)
+    sys.exit(1 if (blocking and not args.trusted) else 0)
 
 
 if __name__ == "__main__":

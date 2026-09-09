@@ -1,7 +1,7 @@
 ---
 name: skill-security-scan
 description: "Security scanner for third-party agent skills (ClawScan-adapted). Use when importing any skill from ClawHub or any external registry into Skills/ or publishing it to AgentConnect — scans for prompt injection, credential exfiltration, dangerous commands, persistence hooks, and obfuscated payloads before the skill is activated. Twin-sec owns this job; any agent can run the script."
-compatibility: Genius Substrates agent fleet (AgentConnect genius-skills source); python3 on host
+compatibility: Created for Zo Computer
 metadata:
   version: "1.0.0"
   author: genius.zo.computer
